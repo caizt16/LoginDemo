@@ -1,3 +1,9 @@
 <resources>
     <string name="app_name">LoginDemo</string>
+    <string name="email">email</string>
+    <string name="password">password</string>
+    <string name="password_confirm">confirm password</string>
+    <string name="sign_up"><u>sign up</u></string>
+    <string name="login">login</string>
+    <string name="sign_up_hint">Don\'t have an account?<u>sign up</u></string>
 </resources>
