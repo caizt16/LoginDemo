@@ -117,7 +117,7 @@ public class MainActivity extends AppCompatActivity {
     private boolean doSignUp(String userEmailAddress, String userPassword, String userPasswordConfirm) {
         if (validateEmailAddress(userEmailAddress) && validatePassword(userPassword)) {
             if (userMap.get(userEmailAddress) != null) {
-                showAlert("User exists!");
+                showAlert("User exists! Please login");
                 return false;
             } else if (!validatePasswordConfirm(userPassword, userPasswordConfirm)) {
                 return false;
