@@ -1,12 +1,10 @@
 package com.example.logindemo;
 
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 
 import android.os.Bundle;
-import android.telephony.ClosedSubscriberGroupInfo;
-import android.text.SpannableString;
-import android.text.style.UnderlineSpan;
-import android.util.Log;
+import android.util.Patterns;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
@@ -14,21 +12,20 @@ import android.widget.Toast;
 
 import com.google.android.material.textfield.TextInputLayout;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
-
-final class AdminAccount {
-    public static String EmailAddress = "Admin@mail.com";
-    public static String Password = "admin";
-}
-
-enum LoginState {
-    AdminSuccess, UserSuccess, WrongEmailPassword
-}
+import java.util.regex.Pattern;
 
 public class MainActivity extends AppCompatActivity {
 
-    private int LoginFailedCounter = 0;
+    private static final Pattern PASSWORD_PATTERN =
+            Pattern.compile("^(?=.*[a-zA-Z]).{4,}$");
+
+    private static int LoginFailedCounter = 0;
+
+    private static Map<String, String> userMap = new HashMap<>();
 
     private final class MainActivityComponent {
         public TextInputLayout EmailAddressLayout;
@@ -47,76 +44,128 @@ public class MainActivity extends AppCompatActivity {
             SignUp = (Button)findViewById(R.id.btnSignUp);
         }
     }
+    private MainActivityComponent Component;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        final MainActivityComponent Component = new MainActivityComponent();
+        userMap.put("admin@mail.com", "admin");
+
+        Component = new MainActivityComponent();
         Component.Login.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
+                clearError();
+
                 String userEmailAddress = Component.EmailAddressLayout.getEditText().getText().toString().trim();
                 String userPassword = Component.PasswordLayout.getEditText().getText().toString();
 
-                LoginState ValidatedState = validate(userEmailAddress, userPassword, Component);
-                checkLoginCounter(Component);
-                Component.EmailAddressLayout.setError(null);
-                Component.PasswordLayout.setError(null);
-                if (ValidatedState.equals(LoginState.WrongEmailPassword)) {
-                    String text = "wrong" + userEmailAddress;
-                    Toast.makeText(getApplicationContext(), text, Toast.LENGTH_SHORT).show();
-                }
+                doLogin(userEmailAddress, userPassword);
+                clearInput();
             }
         });
 
         Component.SignUp.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                Component.PasswordConfirmLayout.setVisibility(View.INVISIBLE);
+                clearError();
 
-                Component.SignUp.setVisibility(View.GONE);
+                String userEmailAddress = Component.EmailAddressLayout.getEditText().getText().toString().trim();
+                String userPassword = Component.PasswordLayout.getEditText().getText().toString();
+                String userPasswordConfirm = Component.PasswordConfirmLayout.getEditText().getText().toString();
 
-                Component.SignUpText.setVisibility(View.VISIBLE);
-                Component.Login.setVisibility(View.VISIBLE);
+                if (doSignUp(userEmailAddress, userPassword, userPasswordConfirm)) {
+                    Component.PasswordConfirmLayout.setVisibility(View.INVISIBLE);
+                    Component.SignUp.setVisibility(View.GONE);
+                    Component.SignUpText.setVisibility(View.VISIBLE);
+                }
+                clearInput();
             }
         });
 
         Component.SignUpText.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
+                clearError();
+
                 Component.PasswordConfirmLayout.setVisibility(View.VISIBLE);
                 Component.SignUp.setVisibility(View.VISIBLE);
-
                 Component.SignUpText.setVisibility(View.GONE);
-                Component.Login.setVisibility(View.GONE);
+
+                clearInput();
             }
         });
 
     }
 
-    private LoginState validate(String userEmailAddress, String userPassword, final MainActivityComponent Component) {
-        if (validateEmailAddress(userEmailAddress, Component) && userPassword.equals(AdminAccount.Password)) {
-            return LoginState.AdminSuccess;
-        } else {
-            LoginFailedCounter ++;
-            return LoginState.WrongEmailPassword;
+    private boolean doLogin(String userEmailAddress, String userPassword) {
+        if (validateEmailAddress(userEmailAddress) && validatePassword(userPassword)) {
+            if (userMap.get(userEmailAddress) != null &&
+                userMap.get(userEmailAddress).equals(userPassword)) {
+                showAlert("Login Successfully");
+                return true;
+            }
+            showAlert("Wrong email or password");
         }
-        // should not reach here;
-        // return LoginState.InvalidState;
+        LoginFailedCounter ++;
+        checkLoginCounter();
+        return false;
     }
 
-    private boolean validateEmailAddress(String userEmailAddress, final MainActivityComponent Component) {
+    private boolean doSignUp(String userEmailAddress, String userPassword, String userPasswordConfirm) {
+        if (validateEmailAddress(userEmailAddress) && validatePassword(userPassword)) {
+            if (userMap.get(userEmailAddress) != null) {
+                showAlert("User exists!");
+                return false;
+            } else if (!validatePasswordConfirm(userPassword, userPasswordConfirm)) {
+                return false;
+            }
+            userMap.put(userEmailAddress, userPassword);
+            showAlert("Sign up successfully!");
+            return true;
+        }
+        return false;
+    }
+
+    private boolean validateEmailAddress(String userEmailAddress) {
         if (userEmailAddress.isEmpty()) {
             Component.EmailAddressLayout.setError("Field can't be empty");
+            return false;
+        } else if (!Patterns.EMAIL_ADDRESS.matcher(userEmailAddress).matches()) {
+            Component.EmailAddressLayout.setError("Please enter a valid email address");
             return false;
         } else {
             return true;
         }
     }
 
-    private void checkLoginCounter(final MainActivityComponent Component) {
+    private boolean validatePassword(String userPassword) {
+        if (userPassword.isEmpty()) {
+            Component.PasswordLayout.setError("Field can't be empty");
+            return false;
+        } else if (!PASSWORD_PATTERN.matcher(userPassword).matches()) {
+            Component.PasswordLayout.setError("Password too weak, at least 4");
+            return false;
+        } else {
+            return true;
+        }
+    }
+
+    private boolean validatePasswordConfirm(String userPassword, String userPasswordConfirm) {
+        if (userPasswordConfirm.isEmpty()) {
+            Component.PasswordConfirmLayout.setError("Field can't be empty");
+            return false;
+        } else if (userPasswordConfirm.equals(userPassword)) {
+            return true;
+        } else {
+            Component.PasswordConfirmLayout.setError("Doesn't match with password");
+            return false;
+        }
+    }
+
+    private void checkLoginCounter() {
         if (LoginFailedCounter >= 5) {
             Component.Login.setEnabled(false);
             Timer buttonTimer = new Timer();
@@ -137,5 +186,23 @@ public class MainActivity extends AppCompatActivity {
         } else if (LoginFailedCounter >= 1) {
             Component.SignUpText.setText(R.string.sign_up_hint);
         }
+    }
+
+    private void clearInput() {
+        Component.PasswordLayout.getEditText().setText(null);
+        Component.PasswordConfirmLayout.getEditText().setText(null);
+    }
+
+    private void clearError() {
+        Component.EmailAddressLayout.setError(null);
+        Component.PasswordLayout.setError(null);
+        Component.PasswordConfirmLayout.setError(null);
+    }
+
+    private void showAlert(String message) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setMessage(message);
+        AlertDialog dialog = builder.create();
+        dialog.show();
     }
 }
